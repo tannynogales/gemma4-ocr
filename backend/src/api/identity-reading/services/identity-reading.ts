@@ -105,7 +105,41 @@ const toPromptSnapshot = (value: unknown): IdentityReadingPromptSnapshot | null 
     return null;
   }
 
-  return promptSnapshot as unknown as IdentityReadingPromptSnapshot;
+  if (promptSnapshot.settings && typeof promptSnapshot.settings === 'object') {
+    return promptSnapshot as unknown as IdentityReadingPromptSnapshot;
+  }
+
+  const defaultPromptDefinition = getLmStudioPromptDefinition();
+
+  return {
+    endpoint:
+      typeof promptSnapshot.endpoint === 'string'
+        ? promptSnapshot.endpoint
+        : defaultPromptDefinition.endpoint,
+    defaultModelName:
+      typeof promptSnapshot.defaultModelName === 'string'
+        ? promptSnapshot.defaultModelName
+        : defaultPromptDefinition.defaultModelName,
+    documentType:
+      typeof promptSnapshot.documentType === 'string'
+        ? promptSnapshot.documentType
+        : defaultPromptDefinition.documentType,
+    settings: {
+      ...defaultPromptDefinition.settings,
+      systemPrompt:
+        typeof promptSnapshot.systemPrompt === 'string'
+          ? promptSnapshot.systemPrompt
+          : defaultPromptDefinition.settings.systemPrompt,
+      userPrompt:
+        typeof promptSnapshot.userPrompt === 'string'
+          ? promptSnapshot.userPrompt
+          : defaultPromptDefinition.settings.userPrompt,
+    },
+    selectedModelName:
+      typeof promptSnapshot.selectedModelName === 'string'
+        ? promptSnapshot.selectedModelName
+        : defaultPromptDefinition.defaultModelName,
+  };
 };
 
 const mapReadingToListItem = (reading: IdentityReadingDocument): IdentityReadingListItem => ({
@@ -375,6 +409,16 @@ export default factories.createCoreService(IDENTITY_READING_UID, ({ strapi }) =>
       const promptDefinition = resolveLmStudioPromptDefinition({
         systemPrompt: body.systemPrompt,
         userPrompt: body.userPrompt,
+        temperature: body.temperature,
+        maxTokens: body.maxTokens,
+        tryJsonObjectResponseFormat: body.tryJsonObjectResponseFormat,
+        enableFieldRecovery: body.enableFieldRecovery,
+        recoverySystemPrompt: body.recoverySystemPrompt,
+        recoveryUserPrompt: body.recoveryUserPrompt,
+        recoveryMaxTokens: body.recoveryMaxTokens,
+        enableDocumentNumberCrop: body.enableDocumentNumberCrop,
+        documentNumberCropPrompt: body.documentNumberCropPrompt,
+        documentNumberCropMaxTokens: body.documentNumberCropMaxTokens,
       });
       const promptSnapshot = buildPromptSnapshot(modelName, promptDefinition);
 
@@ -390,6 +434,7 @@ export default factories.createCoreService(IDENTITY_READING_UID, ({ strapi }) =>
           mimeType: file.mimetype ?? 'application/octet-stream',
           modelName,
           currentPayload: extraction.payload,
+          settings: promptDefinition.settings,
         });
         const mergedRawPayload: RawModelExtractionPayload = {
           ...extraction.payload,

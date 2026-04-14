@@ -5,6 +5,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 import {
+  type IdentityReadingExtractionSettings,
   type IdentityReadingPromptResponse,
   type IdentityReadingModelsResponse,
   type LmStudioModelOption,
@@ -73,6 +74,48 @@ No inventes datos.
 Si un campo no es legible o ambiguo, usa null.
 `;
 
+const RECOVERY_USER_PROMPT = `
+Extrae únicamente los campos faltantes o dudosos de esta cédula y devuelve exactamente este JSON:
+{
+  "documentNumber": null,
+  "nationality": null,
+  "warnings": []
+}
+
+Reglas:
+- documentNumber es el valor visible junto a "NUMERO DOCUMENTO" o "NÚMERO DOCUMENTO".
+- documentNumber no puede ser el RUN ni una copia parcial del RUN.
+- Si el RUN actual detectado es "{{CURRENT_RUN}}", úsalo sólo para evitar confusiones.
+- Conserva el número de documento tal como aparece visible en la cédula.
+- nationality es el valor visible junto a "NACIONALIDAD".
+- Si no puedes leer con suficiente certeza un campo, devuelve null en ese campo.
+`;
+
+const DOCUMENT_NUMBER_CROP_PROMPT = `
+Devuelve exactamente este JSON:
+{
+  "documentNumber": null,
+  "warnings": []
+}
+
+Reglas:
+- Este recorte contiene la zona de "NÚMERO DOCUMENTO".
+- documentNumber es el valor visible junto a esa etiqueta.
+- No es el RUN.
+- No es una copia parcial del RUN.
+- Si el RUN actual detectado es "{{CURRENT_RUN}}", úsalo sólo para evitar confusiones.
+- Si puedes leerlo, conserva los puntos.
+- Si no puedes leerlo con certeza, usa null.
+`;
+
+const DEFAULT_TEMPERATURE = 0;
+const DEFAULT_MAX_TOKENS = 1200;
+const DEFAULT_TRY_JSON_OBJECT_RESPONSE_FORMAT = true;
+const DEFAULT_ENABLE_FIELD_RECOVERY = true;
+const DEFAULT_RECOVERY_MAX_TOKENS = 400;
+const DEFAULT_ENABLE_DOCUMENT_NUMBER_CROP = true;
+const DEFAULT_DOCUMENT_NUMBER_CROP_MAX_TOKENS = 250;
+
 const stripTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 const getBaseUrl = (): string =>
   stripTrailingSlash(process.env.LM_STUDIO_BASE_URL?.trim() || 'http://localhost:1234/v1');
@@ -87,8 +130,20 @@ export const getLmStudioPromptDefinition = (): IdentityReadingPromptResponse => 
   endpoint: getResponseUrl(),
   defaultModelName: getDefaultModelName(),
   documentType: DEFAULT_DOCUMENT_TYPE,
-  systemPrompt: SYSTEM_PROMPT.trim(),
-  userPrompt: USER_PROMPT.trim(),
+  settings: {
+    systemPrompt: SYSTEM_PROMPT.trim(),
+    userPrompt: USER_PROMPT.trim(),
+    temperature: DEFAULT_TEMPERATURE,
+    maxTokens: DEFAULT_MAX_TOKENS,
+    tryJsonObjectResponseFormat: DEFAULT_TRY_JSON_OBJECT_RESPONSE_FORMAT,
+    enableFieldRecovery: DEFAULT_ENABLE_FIELD_RECOVERY,
+    recoverySystemPrompt: RECOVERY_SYSTEM_PROMPT.trim(),
+    recoveryUserPrompt: RECOVERY_USER_PROMPT.trim(),
+    recoveryMaxTokens: DEFAULT_RECOVERY_MAX_TOKENS,
+    enableDocumentNumberCrop: DEFAULT_ENABLE_DOCUMENT_NUMBER_CROP,
+    documentNumberCropPrompt: DOCUMENT_NUMBER_CROP_PROMPT.trim(),
+    documentNumberCropMaxTokens: DEFAULT_DOCUMENT_NUMBER_CROP_MAX_TOKENS,
+  },
 });
 
 const normalizePromptSegment = (value: unknown, fallback: string): string => {
@@ -100,21 +155,133 @@ const normalizePromptSegment = (value: unknown, fallback: string): string => {
   return trimmedValue.length > 0 ? trimmedValue : fallback;
 };
 
+const normalizeBooleanSegment = (value: unknown, fallback: boolean): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalizedValue = value.trim().toLowerCase();
+
+    if (['true', '1', 'yes', 'si', 'sí'].includes(normalizedValue)) {
+      return true;
+    }
+
+    if (['false', '0', 'no'].includes(normalizedValue)) {
+      return false;
+    }
+  }
+
+  return fallback;
+};
+
+const normalizeNumberSegment = (
+  value: unknown,
+  fallback: number,
+  {
+    min,
+    max,
+  }: {
+    min?: number;
+    max?: number;
+  } = {},
+): number => {
+  const parsedValue =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim().length > 0
+        ? Number.parseFloat(value)
+        : Number.NaN;
+
+  if (!Number.isFinite(parsedValue)) {
+    return fallback;
+  }
+
+  if (typeof min === 'number' && parsedValue < min) {
+    return fallback;
+  }
+
+  if (typeof max === 'number' && parsedValue > max) {
+    return fallback;
+  }
+
+  return parsedValue;
+};
+
+const normalizeExtractionSettings = (
+  overrides: Partial<Record<keyof IdentityReadingExtractionSettings, unknown>> = {},
+  fallback: IdentityReadingExtractionSettings,
+): IdentityReadingExtractionSettings => ({
+  systemPrompt: normalizePromptSegment(overrides.systemPrompt, fallback.systemPrompt),
+  userPrompt: normalizePromptSegment(overrides.userPrompt, fallback.userPrompt),
+  temperature: normalizeNumberSegment(overrides.temperature, fallback.temperature, {
+    min: 0,
+    max: 2,
+  }),
+  maxTokens: normalizeNumberSegment(overrides.maxTokens, fallback.maxTokens, {
+    min: 1,
+  }),
+  tryJsonObjectResponseFormat: normalizeBooleanSegment(
+    overrides.tryJsonObjectResponseFormat,
+    fallback.tryJsonObjectResponseFormat,
+  ),
+  enableFieldRecovery: normalizeBooleanSegment(
+    overrides.enableFieldRecovery,
+    fallback.enableFieldRecovery,
+  ),
+  recoverySystemPrompt: normalizePromptSegment(
+    overrides.recoverySystemPrompt,
+    fallback.recoverySystemPrompt,
+  ),
+  recoveryUserPrompt: normalizePromptSegment(
+    overrides.recoveryUserPrompt,
+    fallback.recoveryUserPrompt,
+  ),
+  recoveryMaxTokens: normalizeNumberSegment(
+    overrides.recoveryMaxTokens,
+    fallback.recoveryMaxTokens,
+    {
+      min: 1,
+    },
+  ),
+  enableDocumentNumberCrop: normalizeBooleanSegment(
+    overrides.enableDocumentNumberCrop,
+    fallback.enableDocumentNumberCrop,
+  ),
+  documentNumberCropPrompt: normalizePromptSegment(
+    overrides.documentNumberCropPrompt,
+    fallback.documentNumberCropPrompt,
+  ),
+  documentNumberCropMaxTokens: normalizeNumberSegment(
+    overrides.documentNumberCropMaxTokens,
+    fallback.documentNumberCropMaxTokens,
+    {
+      min: 1,
+    },
+  ),
+});
+
 export const resolveLmStudioPromptDefinition = (
   overrides: {
     systemPrompt?: unknown;
     userPrompt?: unknown;
+    temperature?: unknown;
+    maxTokens?: unknown;
+    tryJsonObjectResponseFormat?: unknown;
+    enableFieldRecovery?: unknown;
+    recoverySystemPrompt?: unknown;
+    recoveryUserPrompt?: unknown;
+    recoveryMaxTokens?: unknown;
+    enableDocumentNumberCrop?: unknown;
+    documentNumberCropPrompt?: unknown;
+    documentNumberCropMaxTokens?: unknown;
   } = {},
 ): IdentityReadingPromptResponse => {
   const defaultPromptDefinition = getLmStudioPromptDefinition();
 
   return {
     ...defaultPromptDefinition,
-    systemPrompt: normalizePromptSegment(
-      overrides.systemPrompt,
-      defaultPromptDefinition.systemPrompt,
-    ),
-    userPrompt: normalizePromptSegment(overrides.userPrompt, defaultPromptDefinition.userPrompt),
+    settings: normalizeExtractionSettings(overrides, defaultPromptDefinition.settings),
   };
 };
 
@@ -478,14 +645,18 @@ const extractPayloadFromImage = async ({
   modelName,
   systemPrompt,
   userPrompt,
+  temperature,
   maxTokens = 1200,
+  tryJsonObjectResponseFormat = true,
 }: {
   filepath: string;
   mimeType: string;
   modelName: string;
   systemPrompt: string;
   userPrompt: string;
+  temperature: number;
   maxTokens?: number;
+  tryJsonObjectResponseFormat?: boolean;
 }): Promise<{
   rawText: string;
   payload: RawModelExtractionPayload;
@@ -498,7 +669,7 @@ const extractPayloadFromImage = async ({
   const timeout = setTimeout(() => abortController.abort(), timeoutMs);
   const baseRequestBody = {
     model: modelName,
-    temperature: 0,
+    temperature,
     max_tokens: maxTokens,
     messages: [
       {
@@ -526,23 +697,27 @@ const extractPayloadFromImage = async ({
   try {
     let responseBody: Record<string, unknown>;
 
-    try {
-      responseBody = await callLmStudioChatCompletions(
-        {
-          ...baseRequestBody,
-          response_format: {
-            type: 'json_object',
+    if (tryJsonObjectResponseFormat) {
+      try {
+        responseBody = await callLmStudioChatCompletions(
+          {
+            ...baseRequestBody,
+            response_format: {
+              type: 'json_object',
+            },
           },
-        },
-        abortController.signal,
-      );
-    } catch (error) {
-      const shouldRetryWithoutResponseFormat = supportsJsonObjectResponseFormat(error);
+          abortController.signal,
+        );
+      } catch (error) {
+        const shouldRetryWithoutResponseFormat = supportsJsonObjectResponseFormat(error);
 
-      if (!shouldRetryWithoutResponseFormat) {
-        throw error;
+        if (!shouldRetryWithoutResponseFormat) {
+          throw error;
+        }
+
+        responseBody = await callLmStudioChatCompletions(baseRequestBody, abortController.signal);
       }
-
+    } else {
       responseBody = await callLmStudioChatCompletions(baseRequestBody, abortController.signal);
     }
 
@@ -671,16 +846,30 @@ const createDocumentNumberCrop = async (filepath: string): Promise<string | null
   }
 };
 
+const renderPromptTemplate = (
+  template: string,
+  variables: Record<string, string | null | undefined>,
+): string =>
+  Object.entries(variables).reduce(
+    (content, [key, value]) =>
+      content
+        .split(`{{${key}}}`)
+        .join(value === null || value === undefined ? 'null' : value),
+    template,
+  );
+
 export const recoverIdentityCardFieldsWithLmStudio = async ({
   filepath,
   mimeType,
   modelName,
   currentPayload,
+  settings,
 }: {
   filepath: string;
   mimeType: string;
   modelName: string;
   currentPayload: RawModelExtractionPayload;
+  settings: IdentityReadingExtractionSettings;
 }): Promise<{
   payload: Partial<RawModelExtractionPayload>;
   rawText: string;
@@ -688,6 +877,10 @@ export const recoverIdentityCardFieldsWithLmStudio = async ({
   documentNumberCropRawText?: string | null;
   documentNumberCropUsage?: Record<string, unknown> | null;
 } | null> => {
+  if (!settings.enableFieldRecovery) {
+    return null;
+  }
+
   const needsDocumentNumber = shouldRecoverDocumentNumber(currentPayload);
   const needsNationality =
     currentPayload.nationality === null ||
@@ -698,30 +891,19 @@ export const recoverIdentityCardFieldsWithLmStudio = async ({
     return null;
   }
 
-  const recoveryUserPrompt = `
-Extrae únicamente los campos faltantes o dudosos de esta cédula y devuelve exactamente este JSON:
-{
-  "documentNumber": null,
-  "nationality": null,
-  "warnings": []
-}
-
-Reglas:
-- documentNumber es el valor visible junto a "NUMERO DOCUMENTO" o "NÚMERO DOCUMENTO".
-- documentNumber no puede ser el RUN ni una copia parcial del RUN.
-- Si el RUN actual detectado es "${currentPayload.run ?? 'null'}", úsalo sólo para evitar confusiones.
-- Conserva el número de documento tal como aparece visible en la cédula.
-- nationality es el valor visible junto a "NACIONALIDAD".
-- Si no puedes leer con suficiente certeza un campo, devuelve null en ese campo.
-`;
+  const recoveryUserPrompt = renderPromptTemplate(settings.recoveryUserPrompt, {
+    CURRENT_RUN: currentPayload.run ?? 'null',
+  });
 
   const recovery = await extractPayloadFromImage({
     filepath,
     mimeType,
     modelName,
-    systemPrompt: RECOVERY_SYSTEM_PROMPT.trim(),
+    systemPrompt: settings.recoverySystemPrompt,
     userPrompt: recoveryUserPrompt.trim(),
-    maxTokens: 400,
+    temperature: settings.temperature,
+    maxTokens: settings.recoveryMaxTokens,
+    tryJsonObjectResponseFormat: settings.tryJsonObjectResponseFormat,
   });
 
   let recoveredDocumentNumber =
@@ -737,32 +919,23 @@ Reglas:
       documentNumber: recoveredDocumentNumber,
     } satisfies RawModelExtractionPayload;
 
-    if (shouldRecoverDocumentNumber(mergedDocumentNumberProbe)) {
+    if (settings.enableDocumentNumberCrop && shouldRecoverDocumentNumber(mergedDocumentNumberProbe)) {
       const cropPath = await createDocumentNumberCrop(filepath);
 
       if (cropPath) {
         try {
+          const cropPrompt = renderPromptTemplate(settings.documentNumberCropPrompt, {
+            CURRENT_RUN: currentPayload.run ?? 'null',
+          });
           const cropRecovery = await extractPayloadFromImage({
             filepath: cropPath,
             mimeType: 'image/jpeg',
             modelName,
-            systemPrompt: RECOVERY_SYSTEM_PROMPT.trim(),
-            userPrompt: `
-Devuelve exactamente este JSON:
-{
-  "documentNumber": null,
-  "warnings": []
-}
-
-Reglas:
-- Este recorte contiene la zona de "NÚMERO DOCUMENTO".
-- documentNumber es el valor visible junto a esa etiqueta.
-- No es el RUN.
-- No es una copia parcial del RUN.
-- Si puedes leerlo, conserva los puntos.
-- Si no puedes leerlo con certeza, usa null.
-`.trim(),
-            maxTokens: 250,
+            systemPrompt: settings.recoverySystemPrompt,
+            userPrompt: cropPrompt.trim(),
+            temperature: settings.temperature,
+            maxTokens: settings.documentNumberCropMaxTokens,
+            tryJsonObjectResponseFormat: settings.tryJsonObjectResponseFormat,
           });
 
           const cropDocumentNumber =
@@ -815,14 +988,17 @@ export const extractIdentityCardWithLmStudio = async ({
   filepath: string;
   mimeType: string;
   modelName: string;
-  promptDefinition: Pick<IdentityReadingPromptResponse, 'systemPrompt' | 'userPrompt'>;
+  promptDefinition: IdentityReadingPromptResponse;
 }): Promise<LmStudioResult> => {
   const extraction = await extractPayloadFromImage({
     filepath,
     mimeType,
     modelName,
-    systemPrompt: promptDefinition.systemPrompt,
-    userPrompt: promptDefinition.userPrompt,
+    systemPrompt: promptDefinition.settings.systemPrompt,
+    userPrompt: promptDefinition.settings.userPrompt,
+    temperature: promptDefinition.settings.temperature,
+    maxTokens: promptDefinition.settings.maxTokens,
+    tryJsonObjectResponseFormat: promptDefinition.settings.tryJsonObjectResponseFormat,
   });
 
   return {

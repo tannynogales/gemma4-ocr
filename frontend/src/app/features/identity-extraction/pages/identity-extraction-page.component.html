@@ -9,7 +9,7 @@
     </div>
 
     <button class="button button-secondary" type="button" (click)="openPromptModal()">
-      Prompt
+      Configuración LM Studio
     </button>
   </div>
 </section>
@@ -177,10 +177,10 @@
     >
       <div class="modal-header">
         <div>
-          <h3 id="prompt-modal-title">Prompt</h3>
+          <h3 id="prompt-modal-title">Configuración LM Studio</h3>
           <p>
-            Puedes editar el prompt que se enviará en la próxima extracción. Si quieres volver al
-            original, usa el reset.
+            Aquí puedes editar tanto los prompts como los parámetros que usa la POC en la próxima
+            extracción. Si quieres volver al original, usa el reset.
           </p>
         </div>
 
@@ -191,7 +191,7 @@
 
       @if (loadingPrompt()) {
         <div class="empty-state">
-          <p>Cargando prompt...</p>
+          <p>Cargando configuración...</p>
         </div>
       } @else if (promptErrorMessage()) {
         <div class="alert alert-error">
@@ -215,24 +215,227 @@
           }
         </div>
 
-        <div class="prompt-section">
-          <h4>System Prompt</h4>
-          <textarea
-            class="prompt-textarea"
-            rows="10"
-            [value]="promptSystemDraft()"
-            (input)="onSystemPromptInput($event)"
-          ></textarea>
+        <div class="prompt-flow">
+          <strong>Qué hace realmente la POC</strong>
+          <ul>
+            <li>Hace una primera llamada sobre la imagen completa.</li>
+            <li>Si falta algo importante, puede hacer un recovery pass.</li>
+            <li>Si sigue faltando `documentNumber`, puede recortar esa zona y reintentar.</li>
+            <li>Después normaliza y guarda el snapshot exacto de esta configuración.</li>
+          </ul>
+          <p>
+            Si comparas con LM Studio manual, allá normalmente estás viendo sólo una llamada. La
+            POC puede usar más de un paso.
+          </p>
         </div>
 
         <div class="prompt-section">
-          <h4>User Prompt</h4>
-          <textarea
-            class="prompt-textarea"
-            rows="14"
-            [value]="promptUserDraft()"
-            (input)="onUserPromptInput($event)"
-          ></textarea>
+          <h4>Llamada principal</h4>
+          <p class="prompt-section-copy">
+            Estos parámetros controlan la llamada principal a LM Studio sobre la imagen completa.
+          </p>
+          @if (settingsDraft(); as settings) {
+            <div class="prompt-grid">
+              <label class="prompt-field">
+                <span>Temperature</span>
+                <small>Más bajo = salida más estable y menos creativa.</small>
+                <input
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  [value]="settings.temperature"
+                  (input)="onNumberSettingInput('temperature', $event)"
+                />
+              </label>
+
+              <label class="prompt-field">
+                <span>Max tokens</span>
+                <small>Límite de tokens de salida del modelo para la extracción principal.</small>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  [value]="settings.maxTokens"
+                  (input)="onNumberSettingInput('maxTokens', $event)"
+                />
+              </label>
+
+              <label class="prompt-field prompt-field--toggle">
+                <span>Intentar `response_format=json_object`</span>
+                <small>
+                  Si LM Studio lo soporta, el backend intenta forzar JSON; si no, hace fallback.
+                </small>
+                <input
+                  type="checkbox"
+                  [checked]="settings.tryJsonObjectResponseFormat"
+                  (change)="onBooleanSettingChange('tryJsonObjectResponseFormat', $event)"
+                />
+              </label>
+            </div>
+          }
+        </div>
+
+        <div class="prompt-section">
+          <h4>Prompts principales</h4>
+          <p class="prompt-section-copy">
+            Estos prompts se usan en la primera extracción sobre la imagen completa.
+          </p>
+          @if (settingsDraft(); as settings) {
+            <div class="prompt-section">
+              <h5>System Prompt</h5>
+              <textarea
+                class="prompt-textarea"
+                rows="10"
+                [value]="settings.systemPrompt"
+                (input)="onTextSettingInput('systemPrompt', $event)"
+              ></textarea>
+            </div>
+
+            <div class="prompt-section">
+              <h5>User Prompt</h5>
+              <textarea
+                class="prompt-textarea"
+                rows="14"
+                [value]="settings.userPrompt"
+                (input)="onTextSettingInput('userPrompt', $event)"
+              ></textarea>
+            </div>
+          }
+        </div>
+
+        <div class="prompt-section">
+          <h4>Recovery Pass</h4>
+          <p class="prompt-section-copy">
+            Si está activo, el backend hace una segunda consulta cuando detecta campos faltantes o
+            dudosos, por ejemplo `documentNumber` o `nationality`.
+          </p>
+          @if (settingsDraft(); as settings) {
+            <div class="prompt-grid">
+              <label class="prompt-field prompt-field--toggle">
+                <span>Activar recovery pass</span>
+                <small>Hace una segunda consulta focalizada cuando el primer pase viene incompleto.</small>
+                <input
+                  type="checkbox"
+                  [checked]="settings.enableFieldRecovery"
+                  (change)="onBooleanSettingChange('enableFieldRecovery', $event)"
+                />
+              </label>
+
+              <label
+                class="prompt-field"
+                [class.prompt-field--disabled]="!settings.enableFieldRecovery"
+              >
+                <span>Recovery max tokens</span>
+                <small>Límite de tokens de la segunda consulta.</small>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  [value]="settings.recoveryMaxTokens"
+                  [disabled]="!settings.enableFieldRecovery"
+                  (input)="onNumberSettingInput('recoveryMaxTokens', $event)"
+                />
+              </label>
+            </div>
+
+            <div
+              class="prompt-section prompt-section--nested"
+              [class.prompt-section--disabled]="!settings.enableFieldRecovery"
+            >
+              <h5>Recovery System Prompt</h5>
+              <textarea
+                class="prompt-textarea"
+                [class.prompt-textarea--disabled]="!settings.enableFieldRecovery"
+                rows="8"
+                [value]="settings.recoverySystemPrompt"
+                [disabled]="!settings.enableFieldRecovery"
+                (input)="onTextSettingInput('recoverySystemPrompt', $event)"
+              ></textarea>
+            </div>
+
+            <div
+              class="prompt-section prompt-section--nested"
+              [class.prompt-section--disabled]="!settings.enableFieldRecovery"
+            >
+              <h5>Recovery User Prompt</h5>
+              <p class="prompt-inline-help">
+                Puedes usar <code ngNonBindable>{{CURRENT_RUN}}</code> como placeholder del RUN actual.
+              </p>
+              <textarea
+                class="prompt-textarea"
+                [class.prompt-textarea--disabled]="!settings.enableFieldRecovery"
+                rows="12"
+                [value]="settings.recoveryUserPrompt"
+                [disabled]="!settings.enableFieldRecovery"
+                (input)="onTextSettingInput('recoveryUserPrompt', $event)"
+              ></textarea>
+            </div>
+          }
+        </div>
+
+        <div
+          class="prompt-section"
+          [class.prompt-section--disabled]="!settingsDraft()?.enableFieldRecovery"
+        >
+          <h4>Crop para Número de Documento</h4>
+          <p class="prompt-section-copy">
+            Si sigue faltando `documentNumber`, la POC puede recortar la zona derecha-centro de la
+            cédula y hacer una tercera consulta sólo para ese campo.
+          </p>
+          @if (settingsDraft(); as settings) {
+            <div class="prompt-grid">
+              <label
+                class="prompt-field prompt-field--toggle"
+                [class.prompt-field--disabled]="!settings.enableFieldRecovery"
+              >
+                <span>Activar crop de documento</span>
+                <small>
+                  Úsalo para rescatar `documentNumber` cuando el full frame no lo lee bien.
+                </small>
+                <input
+                  type="checkbox"
+                  [checked]="settings.enableDocumentNumberCrop"
+                  [disabled]="!settings.enableFieldRecovery"
+                  (change)="onBooleanSettingChange('enableDocumentNumberCrop', $event)"
+                />
+              </label>
+
+              <label
+                class="prompt-field"
+                [class.prompt-field--disabled]="!settings.enableFieldRecovery || !settings.enableDocumentNumberCrop"
+              >
+                <span>Crop max tokens</span>
+                <small>Límite de tokens de la consulta sobre el recorte.</small>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  [value]="settings.documentNumberCropMaxTokens"
+                  [disabled]="!settings.enableFieldRecovery || !settings.enableDocumentNumberCrop"
+                  (input)="onNumberSettingInput('documentNumberCropMaxTokens', $event)"
+                />
+              </label>
+            </div>
+
+            <div
+              class="prompt-section prompt-section--nested"
+              [class.prompt-section--disabled]="!settings.enableFieldRecovery || !settings.enableDocumentNumberCrop"
+            >
+              <h5>Prompt del crop</h5>
+              <p class="prompt-inline-help">
+                También soporta <code ngNonBindable>{{CURRENT_RUN}}</code> como placeholder.
+              </p>
+              <textarea
+                class="prompt-textarea"
+                [class.prompt-textarea--disabled]="!settings.enableFieldRecovery || !settings.enableDocumentNumberCrop"
+                rows="10"
+                [value]="settings.documentNumberCropPrompt"
+                [disabled]="!settings.enableFieldRecovery || !settings.enableDocumentNumberCrop"
+                (input)="onTextSettingInput('documentNumberCropPrompt', $event)"
+              ></textarea>
+            </div>
+          }
         </div>
 
         <div class="prompt-actions">
@@ -240,7 +443,7 @@
             @if (hasCustomPrompt()) {
               <span>Hay cambios listos para la próxima extracción.</span>
             } @else {
-              <span>Se está usando el prompt original del backend.</span>
+              <span>Se está usando la configuración original del backend.</span>
             }
           </div>
 

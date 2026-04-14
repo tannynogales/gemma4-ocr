@@ -135,11 +135,11 @@
 
       <article class="card detail-card">
         <div class="section-title-row">
-          <h3>Prompt final usado</h3>
+          <h3>Configuración final usada</h3>
           <button
             class="help-trigger"
             type="button"
-            aria-label="Qué significa Prompt final usado"
+            aria-label="Qué significa Configuración final usada"
             (click)="openHelp('promptSnapshot')"
           >
             ?
@@ -148,8 +148,23 @@
 
         @if (detail.promptSnapshot) {
           <p class="prompt-summary">
-            Este snapshot corresponde exactamente al prompt enviado en esta extracción.
+            Este snapshot corresponde exactamente a la configuración enviada en esta extracción.
           </p>
+
+          <div class="prompt-detail">
+            <div class="detail-subtitle-row">
+              <h4>Parámetros técnicos</h4>
+            </div>
+            <pre class="json-block">{{ ({
+              temperature: detail.promptSnapshot.settings.temperature,
+              maxTokens: detail.promptSnapshot.settings.maxTokens,
+              tryJsonObjectResponseFormat: detail.promptSnapshot.settings.tryJsonObjectResponseFormat,
+              enableFieldRecovery: detail.promptSnapshot.settings.enableFieldRecovery,
+              recoveryMaxTokens: detail.promptSnapshot.settings.recoveryMaxTokens,
+              enableDocumentNumberCrop: detail.promptSnapshot.settings.enableDocumentNumberCrop,
+              documentNumberCropMaxTokens: detail.promptSnapshot.settings.documentNumberCropMaxTokens
+            }) | json }}</pre>
+          </div>
 
           <div class="prompt-detail">
             <div class="detail-subtitle-row">
@@ -163,7 +178,7 @@
                 ?
               </button>
             </div>
-            <pre class="prompt-block">{{ detail.promptSnapshot.systemPrompt }}</pre>
+            <pre class="prompt-block">{{ detail.promptSnapshot.settings.systemPrompt }}</pre>
           </div>
 
           <div class="prompt-detail">
@@ -178,7 +193,28 @@
                 ?
               </button>
             </div>
-            <pre class="prompt-block">{{ detail.promptSnapshot.userPrompt }}</pre>
+            <pre class="prompt-block">{{ detail.promptSnapshot.settings.userPrompt }}</pre>
+          </div>
+
+          <div class="prompt-detail">
+            <div class="detail-subtitle-row">
+              <h4>Recovery System Prompt</h4>
+            </div>
+            <pre class="prompt-block">{{ detail.promptSnapshot.settings.recoverySystemPrompt }}</pre>
+          </div>
+
+          <div class="prompt-detail">
+            <div class="detail-subtitle-row">
+              <h4>Recovery User Prompt</h4>
+            </div>
+            <pre class="prompt-block">{{ detail.promptSnapshot.settings.recoveryUserPrompt }}</pre>
+          </div>
+
+          <div class="prompt-detail">
+            <div class="detail-subtitle-row">
+              <h4>Prompt del Crop de Documento</h4>
+            </div>
+            <pre class="prompt-block">{{ detail.promptSnapshot.settings.documentNumberCropPrompt }}</pre>
           </div>
         } @else {
           <div class="empty-state compact">

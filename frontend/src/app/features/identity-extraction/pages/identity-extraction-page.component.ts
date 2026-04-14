@@ -14,16 +14,14 @@ import {
   ApiRequestError,
   type AvailableOcrModel,
   type ConfirmIdentityReadingPayload,
+  type IdentityReadingExtractionSettings,
   type IdentityReadingExtractResponse,
   type IdentityReadingPromptResponse,
 } from '../../../core/models/identity-reading.models';
 import { IdentityReadingApiService } from '../../../core/services/identity-reading-api.service';
 import { ReviewFormComponent } from '../components/review-form.component';
 
-type EditablePromptPayload = Pick<
-  IdentityReadingPromptResponse,
-  'systemPrompt' | 'userPrompt'
->;
+type EditablePromptPayload = IdentityReadingExtractionSettings;
 
 @Component({
   selector: 'app-identity-extraction-page',
@@ -55,8 +53,7 @@ export class IdentityExtractionPageComponent {
   readonly loadingPrompt = signal(false);
   readonly promptErrorMessage = signal<string | null>(null);
   readonly promptDefinition = signal<IdentityReadingPromptResponse | null>(null);
-  readonly promptSystemDraft = signal('');
-  readonly promptUserDraft = signal('');
+  readonly settingsDraft = signal<IdentityReadingExtractionSettings | null>(null);
   readonly failedReadingId = signal<number | null>(null);
   readonly currentDraft = signal<IdentityReadingExtractResponse | null>(null);
   readonly selectedModel = computed(() => {
@@ -66,15 +63,13 @@ export class IdentityExtractionPageComponent {
   });
   readonly hasCustomPrompt = computed(() => {
     const promptDefinition = this.promptDefinition();
+    const settingsDraft = this.settingsDraft();
 
-    if (!promptDefinition) {
+    if (!promptDefinition || !settingsDraft) {
       return false;
     }
 
-    return (
-      this.promptSystemDraft().trim() !== promptDefinition.systemPrompt.trim() ||
-      this.promptUserDraft().trim() !== promptDefinition.userPrompt.trim()
-    );
+    return JSON.stringify(settingsDraft) !== JSON.stringify(promptDefinition.settings);
   });
 
   constructor() {
@@ -171,13 +166,12 @@ export class IdentityExtractionPageComponent {
     try {
       const response = await firstValueFrom(this.apiService.getPrompt());
       this.promptDefinition.set(response);
-      this.promptSystemDraft.set(response.systemPrompt);
-      this.promptUserDraft.set(response.userPrompt);
+      this.settingsDraft.set({ ...response.settings });
     } catch (error) {
       if (error instanceof ApiRequestError) {
         this.promptErrorMessage.set(error.message);
       } else {
-        this.promptErrorMessage.set('No fue posible cargar el prompt desde el backend.');
+        this.promptErrorMessage.set('No fue posible cargar la configuración desde el backend.');
       }
     } finally {
       this.loadingPrompt.set(false);
@@ -188,14 +182,39 @@ export class IdentityExtractionPageComponent {
     this.promptModalOpen.set(false);
   }
 
-  onSystemPromptInput(event: Event): void {
+  onTextSettingInput(
+    key:
+      | 'systemPrompt'
+      | 'userPrompt'
+      | 'recoverySystemPrompt'
+      | 'recoveryUserPrompt'
+      | 'documentNumberCropPrompt',
+    event: Event,
+  ): void {
     const textArea = event.target as HTMLTextAreaElement;
-    this.promptSystemDraft.set(textArea.value);
+    this.updateSettingsDraft(key, textArea.value);
   }
 
-  onUserPromptInput(event: Event): void {
-    const textArea = event.target as HTMLTextAreaElement;
-    this.promptUserDraft.set(textArea.value);
+  onNumberSettingInput(
+    key: 'temperature' | 'maxTokens' | 'recoveryMaxTokens' | 'documentNumberCropMaxTokens',
+    event: Event,
+  ): void {
+    const inputElement = event.target as HTMLInputElement;
+    const numericValue = Number.parseFloat(inputElement.value);
+
+    if (!Number.isFinite(numericValue)) {
+      return;
+    }
+
+    this.updateSettingsDraft(key, numericValue);
+  }
+
+  onBooleanSettingChange(
+    key: 'tryJsonObjectResponseFormat' | 'enableFieldRecovery' | 'enableDocumentNumberCrop',
+    event: Event,
+  ): void {
+    const inputElement = event.target as HTMLInputElement;
+    this.updateSettingsDraft(key, inputElement.checked);
   }
 
   resetPromptToOriginal(): void {
@@ -205,8 +224,7 @@ export class IdentityExtractionPageComponent {
       return;
     }
 
-    this.promptSystemDraft.set(promptDefinition.systemPrompt);
-    this.promptUserDraft.set(promptDefinition.userPrompt);
+    this.settingsDraft.set({ ...promptDefinition.settings });
   }
 
   async extract(): Promise<void> {
@@ -301,25 +319,48 @@ export class IdentityExtractionPageComponent {
   }
 
   private buildPromptOverride(): EditablePromptPayload | null {
-    const promptDefinition = this.promptDefinition();
+    const settingsDraft = this.settingsDraft();
 
-    if (!promptDefinition) {
+    if (!settingsDraft) {
       return null;
     }
 
-    const systemPrompt = this.promptSystemDraft().trim();
-    const userPrompt = this.promptUserDraft().trim();
-
-    if (!systemPrompt || !userPrompt) {
-      this.errorMessage.set('El prompt no puede quedar vacío.');
-      this.errorHint.set('Usa "Reset al original" para recuperar el prompt base.');
-      return null;
-    }
-
-    return {
-      systemPrompt,
-      userPrompt,
+    const nextSettings: IdentityReadingExtractionSettings = {
+      ...settingsDraft,
+      systemPrompt: settingsDraft.systemPrompt.trim(),
+      userPrompt: settingsDraft.userPrompt.trim(),
+      recoverySystemPrompt: settingsDraft.recoverySystemPrompt.trim(),
+      recoveryUserPrompt: settingsDraft.recoveryUserPrompt.trim(),
+      documentNumberCropPrompt: settingsDraft.documentNumberCropPrompt.trim(),
     };
+
+    if (
+      !nextSettings.systemPrompt ||
+      !nextSettings.userPrompt ||
+      !nextSettings.recoverySystemPrompt ||
+      !nextSettings.recoveryUserPrompt ||
+      !nextSettings.documentNumberCropPrompt
+    ) {
+      this.errorMessage.set('Los prompts no pueden quedar vacíos.');
+      this.errorHint.set('Usa "Reset al original" para recuperar la configuración base.');
+      return null;
+    }
+
+    return nextSettings;
+  }
+
+  private updateSettingsDraft<K extends keyof IdentityReadingExtractionSettings>(
+    key: K,
+    value: IdentityReadingExtractionSettings[K],
+  ): void {
+    this.settingsDraft.update((currentSettings) =>
+      currentSettings
+        ? {
+            ...currentSettings,
+            [key]: value,
+          }
+        : currentSettings,
+    );
   }
 
   private buildErrorHint(

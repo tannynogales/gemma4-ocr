@@ -48,31 +48,33 @@ const DETAIL_HELP_TOPICS: Record<DetailHelpTopicKey, DetailHelpTopic> = {
     ],
   },
   promptSnapshot: {
-    title: 'Prompt final usado',
+    title: 'Configuración final usada',
     paragraphs: [
-      'Este bloque muestra el snapshot exacto del prompt usado en esta extracción.',
-      'Si editaste el prompt antes de extraer, aquí verás esa versión final y no sólo el prompt base del sistema.',
+      'Este bloque muestra el snapshot exacto de la configuración usada en esta extracción.',
+      'Incluye los prompts y también parámetros como temperature, max tokens y recovery pass.',
+      'Si comparas esta POC con una prueba manual en LM Studio, recuerda que la POC puede haber hecho más de una llamada: pase principal, recovery y crop del número de documento.',
     ],
   },
   systemPrompt: {
     title: 'System Prompt',
     paragraphs: [
       'Es la instrucción general de comportamiento que Strapi le envía al modelo.',
-      'Le indica que responda en JSON válido, que no invente datos, que use null si no sabe algo y que se limite a la imagen proporcionada.',
+      'Le indica el formato de salida esperado y cómo debe comportarse frente a ambigüedad o campos faltantes.',
     ],
   },
   userPrompt: {
     title: 'User Prompt',
     paragraphs: [
       'Es la tarea concreta que se le pide al modelo en esta POC.',
-      'Define que debe extraer la información visible de la cédula chilena frontal y devolverla con la estructura JSON esperada por el backend.',
+      'Define qué campos debe extraer y cómo debe mapearlos desde la cédula hacia el JSON.',
     ],
   },
   aiPayload: {
     title: 'Payload extraído por IA',
     paragraphs: [
       'Es el bloque técnico que guarda el backend con el resultado previo a la confirmación del usuario.',
-      'Normalmente incluye el payload crudo parseado del modelo, la versión normalizada por backend, la respuesta cruda del modelo y metadatos de uso. Si la extracción falla, aquí se guarda el error.',
+      'Normalmente incluye el payload crudo parseado del modelo, la versión normalizada por backend, la respuesta cruda del modelo, metadatos de uso y, si aplica, los pasos de recovery pass o crop de número de documento. Si la extracción falla, aquí se guarda el error.',
+      'Esto sirve para entender por qué la POC pudo obtener un mejor resultado que una prueba manual de una sola llamada en LM Studio.',
     ],
   },
   finalPayload: {

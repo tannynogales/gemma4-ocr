@@ -219,12 +219,105 @@
   background: rgba(248, 249, 251, 0.85);
 }
 
+.prompt-flow {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(15, 92, 108, 0.16);
+  border-radius: var(--radius-md);
+  background: rgba(224, 244, 245, 0.42);
+}
+
+.prompt-flow strong {
+  display: block;
+  margin-bottom: 0.55rem;
+}
+
+.prompt-flow ul,
+.prompt-flow p {
+  margin: 0;
+}
+
+.prompt-flow ul {
+  padding-left: 1.2rem;
+}
+
+.prompt-flow p {
+  margin-top: 0.75rem;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
 .prompt-section + .prompt-section {
   margin-top: 1rem;
 }
 
 .prompt-section h4 {
   margin: 0 0 0.6rem;
+}
+
+.prompt-section h5 {
+  margin: 0 0 0.55rem;
+}
+
+.prompt-section--nested {
+  margin-top: 0.85rem;
+}
+
+.prompt-section--disabled h4,
+.prompt-section--disabled h5 {
+  color: rgba(24, 48, 77, 0.55);
+}
+
+.prompt-section-copy,
+.prompt-inline-help {
+  margin: 0 0 0.75rem;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
+.prompt-section--disabled .prompt-section-copy,
+.prompt-section--disabled .prompt-inline-help {
+  color: rgba(24, 48, 77, 0.45);
+}
+
+.prompt-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.prompt-field {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(24, 48, 77, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(248, 249, 251, 0.85);
+}
+
+.prompt-field small {
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.prompt-field--disabled {
+  border-color: rgba(24, 48, 77, 0.08);
+  background: rgba(233, 237, 243, 0.72);
+  color: rgba(24, 48, 77, 0.58);
+}
+
+.prompt-field--disabled small {
+  color: rgba(24, 48, 77, 0.45);
+}
+
+.prompt-field input[type='number'] {
+  width: 100%;
+}
+
+.prompt-field--toggle input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.35rem;
 }
 
 .prompt-textarea {
@@ -238,6 +331,17 @@
   resize: vertical;
   font: inherit;
   line-height: 1.55;
+}
+
+.prompt-textarea--disabled {
+  border-color: rgba(24, 48, 77, 0.1);
+  background: #d7dee6;
+  color: rgba(15, 34, 54, 0.68);
+}
+
+.prompt-textarea:disabled,
+.prompt-field input:disabled {
+  cursor: not-allowed;
 }
 
 .prompt-textarea:focus {

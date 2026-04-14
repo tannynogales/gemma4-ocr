@@ -6,6 +6,7 @@ import { environment } from '../../../environments/environment';
 import {
   type AvailableOcrModel,
   type ConfirmIdentityReadingPayload,
+  type IdentityReadingExtractionSettings,
   type IdentityReadingDetail,
   type IdentityReadingExtractResponse,
   type IdentityReadingMedia,
@@ -40,15 +41,34 @@ export class IdentityReadingApiService {
   extract(
     file: File,
     modelName: string,
-    promptOverride?: Pick<IdentityReadingPromptResponse, 'systemPrompt' | 'userPrompt'> | null,
+    settingsOverride?: IdentityReadingExtractionSettings | null,
   ) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('modelName', modelName);
 
-    if (promptOverride) {
-      formData.append('systemPrompt', promptOverride.systemPrompt);
-      formData.append('userPrompt', promptOverride.userPrompt);
+    if (settingsOverride) {
+      formData.append('systemPrompt', settingsOverride.systemPrompt);
+      formData.append('userPrompt', settingsOverride.userPrompt);
+      formData.append('temperature', String(settingsOverride.temperature));
+      formData.append('maxTokens', String(settingsOverride.maxTokens));
+      formData.append(
+        'tryJsonObjectResponseFormat',
+        String(settingsOverride.tryJsonObjectResponseFormat),
+      );
+      formData.append('enableFieldRecovery', String(settingsOverride.enableFieldRecovery));
+      formData.append('recoverySystemPrompt', settingsOverride.recoverySystemPrompt);
+      formData.append('recoveryUserPrompt', settingsOverride.recoveryUserPrompt);
+      formData.append('recoveryMaxTokens', String(settingsOverride.recoveryMaxTokens));
+      formData.append(
+        'enableDocumentNumberCrop',
+        String(settingsOverride.enableDocumentNumberCrop),
+      );
+      formData.append('documentNumberCropPrompt', settingsOverride.documentNumberCropPrompt);
+      formData.append(
+        'documentNumberCropMaxTokens',
+        String(settingsOverride.documentNumberCropMaxTokens),
+      );
     }
 
     return this.httpClient

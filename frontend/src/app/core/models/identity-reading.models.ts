@@ -97,12 +97,26 @@ export interface IdentityReadingModelsResponse {
   models: AvailableOcrModel[];
 }
 
+export interface IdentityReadingExtractionSettings {
+  systemPrompt: string;
+  userPrompt: string;
+  temperature: number;
+  maxTokens: number;
+  tryJsonObjectResponseFormat: boolean;
+  enableFieldRecovery: boolean;
+  recoverySystemPrompt: string;
+  recoveryUserPrompt: string;
+  recoveryMaxTokens: number;
+  enableDocumentNumberCrop: boolean;
+  documentNumberCropPrompt: string;
+  documentNumberCropMaxTokens: number;
+}
+
 export interface IdentityReadingPromptResponse {
   endpoint: string;
   defaultModelName: string;
   documentType: string;
-  systemPrompt: string;
-  userPrompt: string;
+  settings: IdentityReadingExtractionSettings;
 }
 
 export interface IdentityReadingPromptSnapshot extends IdentityReadingPromptResponse {

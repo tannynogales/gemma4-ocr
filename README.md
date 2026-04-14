@@ -35,6 +35,73 @@ La solución está pensada para macOS Apple Silicon y prioriza claridad, manteni
 11. Strapi guarda el payload final en SQLite.
 12. Angular permite revisar el historial y el detalle.
 
+## Qué hace la POC con LM Studio
+
+Explicado muy simple:
+
+1. La POC hace una primera consulta a LM Studio sobre la imagen completa.
+2. Le pide una salida JSON con los campos de la cédula.
+3. El backend normaliza algunos valores para que queden consistentes.
+   Ejemplo: RUN sin puntos, nombres con capitalización normalizada, fechas en ISO.
+4. Si un campo importante viene vacío o dudoso, la POC puede hacer una segunda consulta más focalizada.
+5. Si el problema sigue siendo el `documentNumber`, la POC puede recortar la zona derecha-centro de la cédula y hacer una tercera consulta sólo sobre ese bloque.
+
+En otras palabras:
+
+- La POC no siempre hace una sola llamada.
+- Puede hacer una cadena de ayudas para rescatar campos difíciles.
+- Todo eso queda guardado en el historial dentro de `promptSnapshot` y `aiExtractedPayload`.
+
+## Si comparas LM Studio directo vs. la POC
+
+Explicado simple:
+
+- En LM Studio manual normalmente pruebas una sola llamada.
+- En la POC el backend puede hacer hasta tres pasos:
+  llamada principal, recovery pass y crop para `documentNumber`.
+- Después el backend normaliza algunos campos antes de mostrarlos.
+
+Por eso no siempre debes esperar una igualdad 1:1 entre:
+
+- lo que ves en el chat manual de LM Studio
+- y lo que termina apareciendo en la POC
+
+La forma correcta de comparar es revisar en historial:
+
+- `promptSnapshot`: configuración exacta usada en ese intento
+- `aiExtractedPayload`: respuesta cruda, payload normalizado y pasos de recovery/crop
+
+## Variables que ahora usa la POC
+
+Además del modelo y los prompts principales, la POC usa estos parámetros:
+
+- `temperature`
+  Controla qué tan estable vs. creativa será la respuesta.
+  En OCR conviene baja.
+- `maxTokens`
+  Limita el tamaño máximo de la salida de la extracción principal.
+- `tryJsonObjectResponseFormat`
+  Le dice al backend si debe intentar forzar JSON usando `response_format`.
+  Si LM Studio no lo soporta, la POC hace fallback automático.
+- `enableFieldRecovery`
+  Activa una segunda consulta cuando faltan campos como `documentNumber` o `nationality`.
+- `recoverySystemPrompt`
+  Prompt general del recovery pass.
+- `recoveryUserPrompt`
+  Prompt específico del recovery pass.
+  Soporta el placeholder `{{CURRENT_RUN}}`.
+- `recoveryMaxTokens`
+  Límite de tokens del recovery pass.
+- `enableDocumentNumberCrop`
+  Activa el recorte de la zona de `NÚMERO DOCUMENTO`.
+- `documentNumberCropPrompt`
+  Prompt usado sobre el recorte.
+  También soporta `{{CURRENT_RUN}}`.
+- `documentNumberCropMaxTokens`
+  Límite de tokens del paso sobre el recorte.
+
+Todas estas variables quedaron editables desde el frontend, en el modal `Configuración LM Studio`.
+
 ## Requisitos previos
 
 - macOS Apple Silicon
@@ -190,14 +257,28 @@ Recibe `multipart/form-data` con los campos:
 
 - `file`
 - `modelName`
+- `systemPrompt`
+- `userPrompt`
+- `temperature`
+- `maxTokens`
+- `tryJsonObjectResponseFormat`
+- `enableFieldRecovery`
+- `recoverySystemPrompt`
+- `recoveryUserPrompt`
+- `recoveryMaxTokens`
+- `enableDocumentNumberCrop`
+- `documentNumberCropPrompt`
+- `documentNumberCropMaxTokens`
 
 Hace:
 
 - valida tipo y tamaño
 - guarda la imagen localmente
 - valida que el modelo exista en LM Studio
-- llama a LM Studio con el modelo seleccionado
+- llama a LM Studio con el modelo seleccionado y la configuración enviada
 - normaliza la respuesta
+- si hace falta, ejecuta recovery pass
+- si hace falta, recorta la zona de número de documento y reintenta
 - crea registro `draft_extracted`
 - devuelve `id`, imagen, payload extraído y warnings
 
@@ -258,6 +339,8 @@ Devuelve detalle del registro, imagen asociada, payload IA y payload final.
 - Integración LM Studio: `fetch` nativo, sin SDK extra
 - Endpoint usado: `POST /v1/chat/completions`
 - Selector de modelos: el frontend pregunta al backend por `GET /api/identity-readings/models`
+- La UI permite editar prompts y parámetros de ejecución antes de cada extracción
+- El snapshot de configuración queda persistido en cada registro para auditoría
 - Fallback implementado:
   Si LM Studio rechaza `response_format`, el servicio reintenta automáticamente sin ese parámetro
 
@@ -351,9 +434,10 @@ FRONTEND_URL=http://localhost:4200
 
 Si borras `backend/.tmp/data.db`, SQLite se recrea vacío en el siguiente arranque.
 
-## Build de verificación
+## Verificación local recomendada
 
-Se dejó implementado y compilado con:
+No pude correr build en esta terminal porque aquí no están instalados `node` ni `npm`.
+Si quieres verificar todo localmente, usa estos comandos:
 
 ### Backend
 
