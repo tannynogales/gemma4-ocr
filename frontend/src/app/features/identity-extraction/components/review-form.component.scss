@@ -1,0 +1,82 @@
+.review-layout {
+  padding: 1.4rem;
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.review-header h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+}
+
+.review-header p {
+  margin: 0;
+  color: var(--color-muted);
+  line-height: 1.6;
+}
+
+.summary-chips {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.5rem 0.8rem;
+  background: rgba(224, 244, 245, 0.95);
+  color: var(--color-accent);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.warning-panel {
+  margin-bottom: 1.2rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(184, 109, 24, 0.18);
+  background: rgba(184, 109, 24, 0.08);
+  padding: 1rem;
+}
+
+.warning-panel h4 {
+  margin: 0 0 0.6rem;
+  color: var(--color-warning);
+}
+
+.warning-panel ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.field-grid {
+  align-items: start;
+}
+
+.field {
+  align-self: start;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .review-header {
+    flex-direction: column;
+  }
+}

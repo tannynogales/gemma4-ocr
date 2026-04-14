@@ -1,0 +1,267 @@
+<section class="page-header">
+  <h2>Detalle del registro</h2>
+  <p>Revisa la imagen, el resultado de IA y la versión final confirmada por el usuario.</p>
+</section>
+
+@if (flashMessage()) {
+  <div class="alert alert-success detail-banner">
+    {{ flashMessage() }}
+  </div>
+}
+
+@if (errorMessage()) {
+  <div class="alert alert-error">
+    {{ errorMessage() }}
+  </div>
+}
+
+@if (loading()) {
+  <section class="card empty-state">
+    <p>Cargando detalle...</p>
+  </section>
+} @else if (reading(); as detail) {
+  <section class="detail-layout">
+    <article class="card media-panel">
+      <div class="media-header">
+        <h3>{{ displayName(detail) }}</h3>
+        <app-status-badge [status]="detail.status" />
+      </div>
+
+      @if (detail.sourceImage?.absoluteUrl) {
+        <img
+          class="identity-image"
+          [src]="detail.sourceImage?.absoluteUrl"
+          [alt]="detail.sourceImage?.alternativeText || 'Imagen de la cédula'"
+        />
+      } @else {
+        <div class="empty-state compact">
+          <p>No hay imagen asociada.</p>
+        </div>
+      }
+
+      <div class="panel-actions">
+        <a class="button button-secondary" routerLink="/historial">Volver al historial</a>
+        <a class="button button-link" routerLink="/extraer">Nueva extracción</a>
+      </div>
+    </article>
+
+    <div class="detail-content">
+      <article class="card detail-card">
+        <div class="detail-card__header">
+          <div class="section-title-row">
+            <h3>Resumen</h3>
+            <button
+              class="help-trigger"
+              type="button"
+              aria-label="Qué significa Resumen"
+              (click)="openHelp('summary')"
+            >
+              ?
+            </button>
+          </div>
+          <p>Creado el {{ detail.createdAt | date: 'full' }}</p>
+        </div>
+
+        <dl class="key-value-list">
+          <div>
+            <dt>RUN</dt>
+            <dd>{{ detail.run || 'Sin dato' }}</dd>
+          </div>
+          <div>
+            <dt>Número de documento</dt>
+            <dd>{{ detail.documentNumber || 'Sin dato' }}</dd>
+          </div>
+          <div>
+            <dt>Fecha de nacimiento</dt>
+            <dd>{{ detail.birthDate || 'Sin dato' }}</dd>
+          </div>
+          <div>
+            <dt>Fecha de vencimiento</dt>
+            <dd>{{ detail.expiryDate || 'Sin dato' }}</dd>
+          </div>
+          <div>
+            <dt>Sexo</dt>
+            <dd>{{ detail.sex || 'Sin dato' }}</dd>
+          </div>
+          <div>
+            <dt>Nacionalidad</dt>
+            <dd>{{ detail.nationality || 'Sin dato' }}</dd>
+          </div>
+          <div>
+            <dt>Modelo</dt>
+            <dd>{{ detail.modelName }}</dd>
+          </div>
+          <div>
+            <dt class="key-value-label-row">
+              <span>Confianza</span>
+              <button
+                class="help-trigger help-trigger--tiny"
+                type="button"
+                aria-label="Qué significa la confianza y cómo se calcula"
+                (click)="openHelp('confidence')"
+              >
+                ?
+              </button>
+            </dt>
+            <dd>
+              {{
+                detail.confidence !== null ? (detail.confidence * 100 | number: '1.0-0') + '%' : 'Sin score'
+              }}
+            </dd>
+          </div>
+        </dl>
+
+        @if (detail.warnings.length > 0) {
+          <div class="warnings-list">
+            <div class="detail-subtitle-row">
+              <h4>Warnings</h4>
+              <button
+                class="help-trigger help-trigger--small"
+                type="button"
+                aria-label="Qué significan los warnings"
+                (click)="openHelp('warnings')"
+              >
+                ?
+              </button>
+            </div>
+            <ul>
+              @for (warning of detail.warnings; track warning) {
+                <li>{{ warning }}</li>
+              }
+            </ul>
+          </div>
+        }
+      </article>
+
+      <article class="card detail-card">
+        <div class="section-title-row">
+          <h3>Prompt final usado</h3>
+          <button
+            class="help-trigger"
+            type="button"
+            aria-label="Qué significa Prompt final usado"
+            (click)="openHelp('promptSnapshot')"
+          >
+            ?
+          </button>
+        </div>
+
+        @if (detail.promptSnapshot) {
+          <p class="prompt-summary">
+            Este snapshot corresponde exactamente al prompt enviado en esta extracción.
+          </p>
+
+          <div class="prompt-detail">
+            <div class="detail-subtitle-row">
+              <h4>System Prompt</h4>
+              <button
+                class="help-trigger help-trigger--small"
+                type="button"
+                aria-label="Qué significa System Prompt"
+                (click)="openHelp('systemPrompt')"
+              >
+                ?
+              </button>
+            </div>
+            <pre class="prompt-block">{{ detail.promptSnapshot.systemPrompt }}</pre>
+          </div>
+
+          <div class="prompt-detail">
+            <div class="detail-subtitle-row">
+              <h4>User Prompt</h4>
+              <button
+                class="help-trigger help-trigger--small"
+                type="button"
+                aria-label="Qué significa User Prompt"
+                (click)="openHelp('userPrompt')"
+              >
+                ?
+              </button>
+            </div>
+            <pre class="prompt-block">{{ detail.promptSnapshot.userPrompt }}</pre>
+          </div>
+        } @else {
+          <div class="empty-state compact">
+            <p>Este registro fue creado antes de guardar snapshot del prompt.</p>
+          </div>
+        }
+      </article>
+
+      <article class="card detail-card">
+        <div class="section-title-row">
+          <h3>Payload extraído por IA</h3>
+          <button
+            class="help-trigger"
+            type="button"
+            aria-label="Qué significa Payload extraído por IA"
+            (click)="openHelp('aiPayload')"
+          >
+            ?
+          </button>
+        </div>
+        <pre class="json-block">{{ detail.aiExtractedPayload | json }}</pre>
+      </article>
+
+      <article class="card detail-card">
+        <div class="section-title-row">
+          <h3>Payload final confirmado</h3>
+          <button
+            class="help-trigger"
+            type="button"
+            aria-label="Qué significa Payload final confirmado"
+            (click)="openHelp('finalPayload')"
+          >
+            ?
+          </button>
+        </div>
+        <pre class="json-block">{{ detail.finalPayload | json }}</pre>
+      </article>
+
+      @if (detail.rawVisibleText) {
+        <article class="card detail-card">
+          <div class="section-title-row">
+            <h3>Texto visible detectado</h3>
+            <button
+              class="help-trigger"
+              type="button"
+              aria-label="Qué significa Texto visible detectado"
+              (click)="openHelp('rawVisibleText')"
+            >
+              ?
+            </button>
+          </div>
+          <pre class="raw-text-block">{{ detail.rawVisibleText }}</pre>
+        </article>
+      }
+    </div>
+  </section>
+}
+
+@if (activeHelpTopic(); as helpTopic) {
+  <div class="modal-backdrop" (click)="closeHelp()">
+    <div
+      class="modal-card card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="detail-help-modal-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal-header">
+        <div>
+          <h3 id="detail-help-modal-title">{{ helpTopic.title }}</h3>
+          <p>Explicación breve de este bloque dentro de la POC.</p>
+        </div>
+
+        <button class="button button-link modal-close" type="button" (click)="closeHelp()">
+          Cerrar
+        </button>
+      </div>
+
+      <div class="help-copy">
+        @for (paragraph of helpTopic.paragraphs; track paragraph) {
+          <p>{{ paragraph }}</p>
+        }
+      </div>
+    </div>
+  </div>
+}

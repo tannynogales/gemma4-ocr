@@ -1,0 +1,120 @@
+<section class="page-header history-header">
+  <div>
+    <h2>Historial de registros</h2>
+    <p>Consulta los intentos guardados, su estado y accede al detalle de cada lectura.</p>
+  </div>
+
+  <div class="header-actions">
+    <button class="button button-secondary" type="button" (click)="load()" [disabled]="loading() || purging()">
+      {{ loading() ? 'Actualizando...' : 'Actualizar' }}
+    </button>
+    <button
+      class="button button-danger"
+      type="button"
+      (click)="openPurgeModal()"
+      [disabled]="loading() || purging() || readings().length === 0"
+    >
+      {{ purging() ? 'Borrando...' : 'Borrar todo' }}
+    </button>
+  </div>
+</section>
+
+@if (errorMessage()) {
+  <div class="alert alert-error history-banner">{{ errorMessage() }}</div>
+}
+
+@if (successMessage()) {
+  <div class="alert alert-success history-banner">{{ successMessage() }}</div>
+}
+
+@if (loading()) {
+  <section class="card empty-state">
+    <p>Cargando historial...</p>
+  </section>
+} @else if (readings().length === 0) {
+  <section class="card empty-state">
+    <p>Aún no hay registros guardados.</p>
+  </section>
+} @else {
+  <section class="card history-table">
+    <div class="table-head table-row">
+      <span>Estado</span>
+      <span>Nombre</span>
+      <span>RUN</span>
+      <span>Modelo</span>
+      <span>Fecha</span>
+      <span></span>
+    </div>
+
+    @for (reading of readings(); track reading.id) {
+      <div class="table-row">
+        <span><app-status-badge [status]="reading.status" /></span>
+        <span class="cell-strong">{{ displayName(reading) }}</span>
+        <span>{{ reading.run || 'Sin dato' }}</span>
+        <span class="cell-muted">{{ reading.modelName }}</span>
+        <span>{{ reading.createdAt | date: 'medium' }}</span>
+        <span class="actions">
+          <a [routerLink]="['/historial', reading.id]">Ver detalle</a>
+        </span>
+      </div>
+    }
+  </section>
+}
+
+@if (purgeModalOpen()) {
+  <div class="modal-backdrop" (click)="closePurgeModal()">
+    <div
+      class="modal-card card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="purge-modal-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal-header">
+        <div>
+          <h3 id="purge-modal-title">Borrar todo el historial</h3>
+          <p>
+            Esta acción eliminará todos los registros guardados y sus imágenes locales asociadas.
+            No se puede deshacer.
+          </p>
+        </div>
+      </div>
+
+      <div class="alert alert-error modal-warning">
+        <strong>Advertencia:</strong> se borrará todo el historial de la POC.
+      </div>
+
+      <div class="field">
+        <label for="purgeConfirmationText">
+          Escribe <strong>{{ purgeConfirmationExpected }}</strong> para confirmar
+        </label>
+        <input
+          id="purgeConfirmationText"
+          type="text"
+          [value]="purgeConfirmationText()"
+          (input)="onPurgeConfirmationInput($event)"
+          [disabled]="purging()"
+          placeholder="BORRAR TODO"
+        />
+      </div>
+
+      @if (purgeErrorMessage()) {
+        <div class="alert alert-error modal-error">{{ purgeErrorMessage() }}</div>
+      }
+
+      <div class="modal-actions">
+        <button class="button button-secondary" type="button" (click)="closePurgeModal()" [disabled]="purging()">
+          Cancelar
+        </button>
+        <button
+          class="button button-danger"
+          type="button"
+          (click)="purgeAll()"
+          [disabled]="purging() || purgeConfirmationText().trim() !== purgeConfirmationExpected"
+        >
+          {{ purging() ? 'Borrando...' : 'Confirmar borrado' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

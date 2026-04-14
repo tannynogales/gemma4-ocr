@@ -1,0 +1,259 @@
+<section class="page-header">
+  <div class="page-header-row">
+    <div>
+      <h2>Extracción de cédula</h2>
+      <p>
+        Sube la cara frontal de una cédula chilena. La imagen viaja sólo al backend, que invoca
+        LM Studio localmente y devuelve un borrador editable antes de guardar.
+      </p>
+    </div>
+
+    <button class="button button-secondary" type="button" (click)="openPromptModal()">
+      Prompt
+    </button>
+  </div>
+</section>
+
+@if (errorMessage()) {
+  <div class="alert alert-error page-error">
+    <strong>Error:</strong> {{ errorMessage() }}
+    @if (errorHint()) {
+      <p class="error-hint">
+        <strong>Posible causa:</strong> {{ errorHint() }}
+      </p>
+    }
+    @if (errorDetails().length > 0 || errorRawResponse()) {
+      <details class="error-details">
+        <summary>Ver detalle técnico</summary>
+        @if (errorDetails().length > 0) {
+          <ul>
+            @for (detail of errorDetails(); track detail) {
+              <li>{{ detail }}</li>
+            }
+          </ul>
+        }
+        @if (errorRawResponse()) {
+          <p class="error-raw-label">Respuesta cruda parcial del modelo</p>
+          <pre class="error-raw-block">{{ errorRawResponse() }}</pre>
+        }
+      </details>
+    }
+    @if (failedReadingId()) {
+      <div class="error-link">
+        <a [routerLink]="['/historial', failedReadingId()]">Ver intento fallido en historial</a>
+      </div>
+    }
+  </div>
+}
+
+<section class="extractor-layout">
+  <article class="card uploader-card">
+    <div class="uploader-copy">
+      <h3>Paso 1. Selecciona una imagen</h3>
+      <p>
+        Formatos permitidos: JPG y PNG. Tamaño máximo: {{ maxUploadSizeMb }} MB.
+      </p>
+    </div>
+
+    <label class="file-picker">
+      <span>Elegir archivo</span>
+      <input type="file" accept="image/png,image/jpeg" (change)="onFileSelected($event)" />
+    </label>
+
+    <div class="field model-field">
+      <label for="modelName">Modelo OCR local</label>
+      <div class="model-picker-row">
+        <select
+          id="modelName"
+          [value]="selectedModelName() ?? ''"
+          [disabled]="loadingModels() || availableModels().length === 0"
+          (change)="onModelSelected($event)"
+        >
+          <option value="" disabled>Selecciona un modelo</option>
+          @for (model of availableModels(); track model.id) {
+            <option [value]="model.id">
+              {{ model.label }}{{ model.isDefault ? ' (por defecto)' : '' }}
+            </option>
+          }
+        </select>
+
+        <button
+          class="button button-secondary refresh-models-button"
+          type="button"
+          (click)="loadModels()"
+          [disabled]="loadingModels()"
+        >
+          {{ loadingModels() ? 'Actualizando...' : 'Actualizar modelos' }}
+        </button>
+      </div>
+
+      @if (selectedModel(); as model) {
+        <p class="field-help">
+          Se usará <strong>{{ model.id }}</strong>
+          @if (model.ownedBy) {
+            <span> · proveedor: {{ model.ownedBy }}</span>
+          }
+        </p>
+      } @else if (!loadingModels() && availableModels().length === 0 && !modelErrorMessage()) {
+        <p class="field-help">
+          No hay modelos visibles. Verifica LM Studio y vuelve a actualizar.
+        </p>
+      }
+
+      @if (modelErrorMessage()) {
+        <p class="field-error">{{ modelErrorMessage() }}</p>
+      }
+    </div>
+
+    @if (selectedFile()) {
+      <div class="file-meta">
+        <strong>{{ selectedFile()?.name }}</strong>
+        <span>{{ ((selectedFile()?.size ?? 0) / 1024 / 1024).toFixed(2) }} MB</span>
+      </div>
+    }
+
+    @if (previewUrl()) {
+      <figure class="preview-panel">
+        <img [src]="previewUrl()" alt="Vista previa de la cédula cargada" />
+      </figure>
+    } @else {
+      <div class="preview-empty">
+        <p>La vista previa aparecerá aquí después de seleccionar el archivo.</p>
+      </div>
+    }
+
+    <div class="uploader-actions">
+      <button
+        class="button button-primary"
+        type="button"
+        (click)="extract()"
+        [disabled]="!selectedFile() || extracting() || loadingModels() || !selectedModelName()"
+      >
+        {{ extracting() ? 'Extrayendo...' : 'Extraer datos' }}
+      </button>
+
+      @if (currentDraft()) {
+        <a class="button button-link" [routerLink]="['/historial', currentDraft()?.id]">
+          Ver registro actual
+        </a>
+      }
+    </div>
+
+    @if (currentDraft()) {
+      <p class="selected-model-note">
+        Última extracción realizada con <strong>{{ currentDraft()?.modelName }}</strong>.
+      </p>
+    }
+  </article>
+
+  <aside class="card info-card">
+    <h3>Qué guarda la POC</h3>
+    <ul>
+      <li>Imagen original subida al backend.</li>
+      <li>Payload extraído por IA y texto visible crudo.</li>
+      <li>Versión final confirmada por el usuario.</li>
+      <li>Modelo utilizado, estado y timestamps.</li>
+    </ul>
+  </aside>
+</section>
+
+@if (currentDraft(); as draft) {
+  <app-review-form
+    [extractedPayload]="draft.extractedPayload"
+    [saving]="saving()"
+    (confirmRequested)="confirm($event)"
+    (retryRequested)="retryExtraction()"
+  />
+}
+
+@if (promptModalOpen()) {
+  <div class="modal-backdrop" (click)="closePromptModal()">
+    <div
+      class="modal-card card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="prompt-modal-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal-header">
+        <div>
+          <h3 id="prompt-modal-title">Prompt</h3>
+          <p>
+            Puedes editar el prompt que se enviará en la próxima extracción. Si quieres volver al
+            original, usa el reset.
+          </p>
+        </div>
+
+        <button class="button button-link modal-close" type="button" (click)="closePromptModal()">
+          Cerrar
+        </button>
+      </div>
+
+      @if (loadingPrompt()) {
+        <div class="empty-state">
+          <p>Cargando prompt...</p>
+        </div>
+      } @else if (promptErrorMessage()) {
+        <div class="alert alert-error">
+          <strong>Error:</strong> {{ promptErrorMessage() }}
+        </div>
+      } @else if (promptDefinition(); as prompt) {
+        <div class="prompt-meta">
+          <div>
+            <strong>Endpoint:</strong>
+            <span>{{ prompt.endpoint }}</span>
+          </div>
+          <div>
+            <strong>Tipo de documento:</strong>
+            <span>{{ prompt.documentType }}</span>
+          </div>
+          @if (selectedModelName()) {
+            <div>
+              <strong>Modelo actualmente seleccionado:</strong>
+              <span>{{ selectedModelName() }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="prompt-section">
+          <h4>System Prompt</h4>
+          <textarea
+            class="prompt-textarea"
+            rows="10"
+            [value]="promptSystemDraft()"
+            (input)="onSystemPromptInput($event)"
+          ></textarea>
+        </div>
+
+        <div class="prompt-section">
+          <h4>User Prompt</h4>
+          <textarea
+            class="prompt-textarea"
+            rows="14"
+            [value]="promptUserDraft()"
+            (input)="onUserPromptInput($event)"
+          ></textarea>
+        </div>
+
+        <div class="prompt-actions">
+          <div class="prompt-state">
+            @if (hasCustomPrompt()) {
+              <span>Hay cambios listos para la próxima extracción.</span>
+            } @else {
+              <span>Se está usando el prompt original del backend.</span>
+            }
+          </div>
+
+          <button
+            class="button button-secondary"
+            type="button"
+            (click)="resetPromptToOriginal()"
+            [disabled]="!hasCustomPrompt()"
+          >
+            Reset al original
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+}

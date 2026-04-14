@@ -1,0 +1,10 @@
+.DS_Store
+
+backend/.env
+backend/.tmp/
+backend/dist/
+backend/node_modules/
+
+frontend/.angular/
+frontend/dist/
+frontend/node_modules/

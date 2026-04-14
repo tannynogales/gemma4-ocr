@@ -1,0 +1,129 @@
+<section class="review-layout card">
+  <div class="review-header">
+    <div>
+      <h3>Revisión antes de guardar</h3>
+      <p>
+        Corrige los campos si hace falta y confirma. El backend guardará la versión final en
+        SQLite.
+      </p>
+    </div>
+
+    <div class="summary-chips">
+      <span class="chip">
+        <strong>Confianza:</strong>
+        {{ confidenceLabel() }}
+      </span>
+      <span class="chip">
+        <strong>Documento:</strong>
+        cédula chilena frontal
+      </span>
+    </div>
+  </div>
+
+  @if (extractedPayload().warnings.length > 0) {
+    <div class="warning-panel">
+      <h4>Advertencias de extracción</h4>
+      <ul>
+        @for (warning of extractedPayload().warnings; track warning) {
+          <li>{{ warning }}</li>
+        }
+      </ul>
+    </div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" class="form-grid">
+    <div class="field-grid">
+      <div class="field">
+        <label for="run">RUN</label>
+        <input id="run" type="text" formControlName="run" placeholder="12.345.678-5" />
+        <p class="field-help">Se valida visualmente el dígito verificador.</p>
+        @if (form.controls.run.touched && form.controls.run.hasError('invalidRun')) {
+          <p class="field-error">El RUN no pasa la validación.</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="documentNumber">Número de documento</label>
+        <input
+          id="documentNumber"
+          type="text"
+          formControlName="documentNumber"
+          placeholder="Número de documento"
+        />
+      </div>
+
+      <div class="field">
+        <label for="givenNames">Nombres</label>
+        <input id="givenNames" type="text" formControlName="givenNames" placeholder="Nombres" />
+      </div>
+
+      <div class="field">
+        <label for="surnames">Apellidos</label>
+        <input id="surnames" type="text" formControlName="surnames" placeholder="Apellidos" />
+      </div>
+
+      <div class="field">
+        <label for="fullName">Nombre completo</label>
+        <input id="fullName" type="text" formControlName="fullName" placeholder="Nombre completo" />
+      </div>
+
+      <div class="field">
+        <label for="nationality">Nacionalidad</label>
+        <input
+          id="nationality"
+          type="text"
+          formControlName="nationality"
+          placeholder="Chilena"
+        />
+      </div>
+
+      <div class="field">
+        <label for="birthDate">Fecha de nacimiento</label>
+        <input id="birthDate" type="date" formControlName="birthDate" />
+        @if (extractedPayload().birthDateRaw && !extractedPayload().birthDate) {
+          <p class="field-help">
+            Valor OCR original: {{ extractedPayload().birthDateRaw }}
+          </p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="expiryDate">Fecha de vencimiento</label>
+        <input id="expiryDate" type="date" formControlName="expiryDate" />
+        @if (extractedPayload().expiryDateRaw && !extractedPayload().expiryDate) {
+          <p class="field-help">
+            Valor OCR original: {{ extractedPayload().expiryDateRaw }}
+          </p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="sex">Sexo</label>
+        <select id="sex" formControlName="sex">
+          <option value="">Sin dato</option>
+          <option value="M">M</option>
+          <option value="F">F</option>
+          <option value="X">X</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="reviewNotes">Notas de revisión</label>
+        <textarea
+          id="reviewNotes"
+          formControlName="reviewNotes"
+          placeholder="Opcional: anota una corrección o contexto útil."
+        ></textarea>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="button button-primary" type="submit" [disabled]="saving()">
+        {{ saving() ? 'Guardando...' : 'Confirmar y guardar' }}
+      </button>
+      <button class="button button-secondary" type="button" (click)="retryRequested.emit()">
+        Volver a intentar
+      </button>
+    </div>
+  </form>
+</section>

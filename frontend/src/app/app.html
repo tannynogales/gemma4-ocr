@@ -1,0 +1,36 @@
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="topbar__brand">
+        <p class="eyebrow">cedula-poc</p>
+        <p class="topbar__tagline">OCR local para cédula chilena</p>
+      </div>
+
+      <nav class="topbar__nav" aria-label="Navegación principal">
+        <a
+          routerLink="/extraer"
+          routerLinkActive="is-active"
+          [routerLinkActiveOptions]="{ exact: true }"
+        >
+          Extracción
+        </a>
+        <a routerLink="/historial" routerLinkActive="is-active">Historial</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="app-content">
+    <section class="app-header">
+      <div class="header-copy">
+        <h1>Cédula chilena + Gemma 4 E2B</h1>
+        <p class="subtitle">
+          Subida local, extracción asistida por LM Studio y confirmación final en Strapi.
+        </p>
+      </div>
+    </section>
+
+    <main class="app-main">
+      <router-outlet />
+    </main>
+  </div>
+</div>

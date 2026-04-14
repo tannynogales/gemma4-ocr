@@ -1,0 +1,87 @@
+
+{
+  "kind": "collectionType",
+  "collectionName": "identity_readings",
+  "info": {
+    "singularName": "identity-reading",
+    "pluralName": "identity-readings",
+    "displayName": "Identity Reading",
+    "description": "OCR extraction and review records for Chilean identity card front images"
+  },
+  "options": {
+    "draftAndPublish": false,
+    "comment": ""
+  },
+  "attributes": {
+    "sourceImage": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "run": {
+      "type": "string",
+      "maxLength": 12
+    },
+    "givenNames": {
+      "type": "string"
+    },
+    "surnames": {
+      "type": "string"
+    },
+    "fullName": {
+      "type": "string"
+    },
+    "documentNumber": {
+      "type": "string"
+    },
+    "birthDate": {
+      "type": "date"
+    },
+    "expiryDate": {
+      "type": "date"
+    },
+    "sex": {
+      "type": "enumeration",
+      "enum": ["M", "F", "X"]
+    },
+    "nationality": {
+      "type": "string"
+    },
+    "rawVisibleText": {
+      "type": "text"
+    },
+    "modelName": {
+      "type": "string",
+      "required": true
+    },
+    "promptSnapshot": {
+      "type": "json"
+    },
+    "confidence": {
+      "type": "decimal"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "draft_extracted",
+        "reviewed_confirmed",
+        "reviewed_corrected",
+        "extraction_failed"
+      ],
+      "default": "draft_extracted",
+      "required": true
+    },
+    "warnings": {
+      "type": "json"
+    },
+    "reviewNotes": {
+      "type": "text"
+    },
+    "aiExtractedPayload": {
+      "type": "json"
+    },
+    "finalPayload": {
+      "type": "json"
+    }
+  }
+}
