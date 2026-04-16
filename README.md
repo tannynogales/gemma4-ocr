@@ -295,6 +295,26 @@ Incluye:
 - `ownedBy`
 - `isDefault`
 
+### `GET /api/identity-readings/prompt`
+
+Devuelve la configuración base que usa la UI para abrir el modal `Configuración LM Studio`.
+
+Incluye:
+
+- `endpoint`
+- `defaultModelName`
+- `documentType`
+- `settings`
+
+### `DELETE /api/identity-readings/purge`
+
+Borra historial e imágenes asociadas si el cliente envía exactamente `confirmationText=BORRAR TODO`.
+
+Devuelve:
+
+- `deletedReadings`
+- `deletedFiles`
+
 ### `POST /api/identity-readings/:id/confirm`
 
 Recibe el payload final editado por el usuario.
